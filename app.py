@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import os
+from sklearn.metrics import accuracy_score, confusion_matrix
 
 # ------------------------------
 # Load model
@@ -22,7 +23,6 @@ st.write("Enter the details below to predict electricity theft:")
 test_csv_path = "dataset/test_data.csv"
 if os.path.exists(test_csv_path):
     data = pd.read_csv(test_csv_path)
-    # Detect features and label
     label_col = "theft" if "theft" in data.columns else data.columns[-1]
     X_test = data.drop(label_col, axis=1)
     y_test = data[label_col]
@@ -32,14 +32,10 @@ else:
     y_test = None
 
 # ------------------------------
-# Dynamic user input based on model features
+# Dynamic user input
 # ------------------------------
 user_input_dict = {}
-if X_test.empty and hasattr(model, "feature_names_in_"):
-    feature_names = model.feature_names_in_
-else:
-    feature_names = X_test.columns
-
+feature_names = X_test.columns if not X_test.empty else model.feature_names_in_
 for feature in feature_names:
     user_input_dict[feature] = st.number_input(feature, value=0.0)
 
@@ -51,18 +47,30 @@ user_input_df = pd.DataFrame([user_input_dict])
 if st.button("Predict Theft"):
     try:
         prediction = model.predict(user_input_df)
-        st.success(f"**Theft Prediction:** {'Yes' if prediction[0] == 1 else 'No'}")
+        predicted_label = "Theft" if prediction[0] == 1 else "No Theft"
+        st.success(f"**Your Input Prediction:** {predicted_label}")
+
+        # ------------------------------
+        # Mini confusion for single input
+        # ------------------------------
+        st.write("**Mini Confusion Matrix for Your Input:**")
+        st.write(pd.DataFrame(
+            [[1 if prediction[0]==0 else 0, 0],
+             [0, 1 if prediction[0]==1 else 0]],
+            columns=["Predicted No Theft", "Predicted Theft"],
+            index=["Actual No Theft?", "Actual Theft?"]
+        ))
+
     except Exception as e:
         st.error(f"Prediction error: {e}")
 
 # ------------------------------
-# Optional: Show model metrics
+# Real model metrics
 # ------------------------------
 if y_test is not None and st.checkbox("Show model accuracy and confusion matrix"):
-    from sklearn.metrics import accuracy_score, confusion_matrix
     y_pred = model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred)
     st.write("**Model Accuracy on Test Data:**", acc)
-    st.write("**Confusion Matrix:**")
+    st.write("**Confusion Matrix on Test Data:**")
     st.write(cm)
