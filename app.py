@@ -1,102 +1,73 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import joblib
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+# app.py
 import os
 import pandas as pd
+import streamlit as st
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, confusion_matrix
 
+# -----------------------
+# Load Dataset
+# -----------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dataset_path = os.path.join(BASE_DIR, "dataset", "smart_grid_electricity_theft_dataset_1000.csv")
 
-data = pd.read_csv(dataset_path)
-st.title("⚡ Smart Grid Electricity Theft Detection System")
+try:
+    data = pd.read_csv(dataset_path)
+except FileNotFoundError:
+    st.error(f"Dataset not found at: {dataset_path}")
+    st.stop()
 
-# Load dataset
-data = pd.read_csv("smart_grid_electricity_theft_dataset_1000.csv")
-
-# Load trained model
-model = joblib.load("model.pkl")
-
-st.subheader("Dataset Preview")
-st.dataframe(data.head())
-
-# ------------------------------
-# Prediction Section
-# ------------------------------
-
-st.subheader("Electricity Theft Prediction")
-
-avg_daily_usage = st.number_input("Average Daily Usage (kWh)")
-peak_usage = st.number_input("Peak Usage (kWh)")
-night_usage = st.number_input("Night Usage (kWh)")
-voltage = st.number_input("Voltage")
-current = st.number_input("Current")
-power_factor = st.number_input("Power Factor")
-anomaly_score = st.number_input("Anomaly Score")
-
-if st.button("Predict Theft"):
-
-    features = np.array([[1, avg_daily_usage, peak_usage, night_usage,
-                          voltage, current, power_factor, anomaly_score]])
-
-    prediction = model.predict(features)
-
-    if prediction[0] == 1:
-        st.error("⚠ Electricity Theft Detected")
-    else:
-        st.success("✅ No Theft Detected")
-
-# ------------------------------
-# Graph Section
-# ------------------------------
-
-st.subheader("Data Visualization")
-
-# Graph 1 - Theft distribution
-fig1, ax1 = plt.subplots()
-data['theft_label'].value_counts().plot(kind='bar', ax=ax1)
-ax1.set_title("Electricity Theft Distribution")
-st.pyplot(fig1)
-
-# Graph 2 - Average vs Peak usage
-fig2, ax2 = plt.subplots()
-ax2.scatter(data['avg_daily_usage_kwh'], data['peak_usage_kwh'])
-ax2.set_title("Average vs Peak Usage")
-st.pyplot(fig2)
-
-# Graph 3 - Voltage distribution
-fig3, ax3 = plt.subplots()
-data['voltage'].plot(kind='hist', bins=20, ax=ax3)
-ax3.set_title("Voltage Distribution")
-st.pyplot(fig3)
-
-# Graph 4 - Current vs Power Factor
-fig4, ax4 = plt.subplots()
-ax4.scatter(data['current'], data['power_factor'])
-ax4.set_title("Current vs Power Factor")
-st.pyplot(fig4)
-
-# Graph 5 - Anomaly score
-fig5, ax5 = plt.subplots()
-data['anomaly_score'].plot(kind='box', ax=ax5)
-ax5.set_title("Anomaly Score Analysis")
-st.pyplot(fig5)
-
-# ------------------------------
-# Model Evaluation
-# ------------------------------
-
-st.subheader("Model Evaluation")
-
-X = data.drop(columns=['theft_label','consumer_id'])
+# -----------------------
+# Prepare Data for Training
+# -----------------------
+# Exclude non-feature columns
+X = data.drop(['consumer_id', 'theft_label'], axis=1)
 y = data['theft_label']
 
-pred = model.predict(X)
+# Train/Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-cm = confusion_matrix(y, pred)
+# Train Random Forest Model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
 
-fig6, ax6 = plt.subplots()
-ConfusionMatrixDisplay(cm).plot(ax=ax6)
-st.pyplot(fig6)
+# Evaluate Model
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+cm = confusion_matrix(y_test, y_pred)
+
+# -----------------------
+# Streamlit App
+# -----------------------
+st.title("Smart Grid Electricity Theft Detection")
+st.write("Predict electricity theft based on consumer usage patterns.")
+
+# Sidebar Input
+st.sidebar.header("Enter Consumer Data")
+avg_daily_usage = st.sidebar.number_input("Average Daily Usage (kWh)", min_value=0.0)
+peak_usage = st.sidebar.number_input("Peak Usage (kWh)", min_value=0.0)
+night_usage = st.sidebar.number_input("Night Usage (kWh)", min_value=0.0)
+voltage = st.sidebar.number_input("Voltage", min_value=0.0)
+current = st.sidebar.number_input("Current", min_value=0.0)
+power_factor = st.sidebar.number_input("Power Factor", min_value=0.0)
+anomaly_score = st.sidebar.number_input("Anomaly Score", min_value=0.0)
+
+input_df = pd.DataFrame(
+    [[avg_daily_usage, peak_usage, night_usage, voltage, current, power_factor, anomaly_score]],
+    columns=X.columns  # ensures feature names match training
+)
+
+# Predict Button
+if st.button("Predict Theft"):
+    prediction = model.predict(input_df)[0]
+    result = "Theft Detected ⚠️" if prediction == 1 else "No Theft ✅"
+    st.subheader("Prediction Result:")
+    st.write(result)
+
+# Show Model Metrics
+st.subheader("Model Accuracy")
+st.write(f"{accuracy*100:.2f}%")
+
+st.subheader("Confusion Matrix")
+st.write(cm)
