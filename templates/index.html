@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Electricity Theft Detection</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Smart Grid Electricity Theft Detection</h1>
+
+<form action="/predict" method="post">
+
+<input type="text" name="consumer_id" placeholder="Consumer ID"><br><br>
+
+<input type="text" name="avg_daily_usage_kwh" placeholder="Average Daily Usage"><br><br>
+
+<input type="text" name="peak_usage_kwh" placeholder="Peak Usage"><br><br>
+
+<input type="text" name="night_usage_kwh" placeholder="Night Usage"><br><br>
+
+<input type="text" name="voltage" placeholder="Voltage"><br><br>
+
+<input type="text" name="current" placeholder="Current"><br><br>
+
+<input type="text" name="power_factor" placeholder="Power Factor"><br><br>
+
+<input type="text" name="anomaly_score" placeholder="Anomaly Score"><br><br>
+
+<button type="submit">Predict</button>
+
+</form>
+
+<h2>{{ prediction_text }}</h2>
+
+<div class="graphs">
+
+{% if graph1 %}
+<img src="{{ url_for('static', filename=graph1) }}">
+<img src="{{ url_for('static', filename=graph2) }}">
+<img src="{{ url_for('static', filename=graph3) }}">
+<img src="{{ url_for('static', filename=graph4) }}">
+<img src="{{ url_for('static', filename=graph5) }}">
+{% endif %}
+
+</div>
+
+</div>
+
+</body>
+</html>
