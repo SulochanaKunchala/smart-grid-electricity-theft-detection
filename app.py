@@ -4,7 +4,13 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import os
+import pandas as pd
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+dataset_path = os.path.join(BASE_DIR, "dataset", "smart_grid_electricity_theft_dataset_1000.csv")
+
+data = pd.read_csv(dataset_path)
 st.title("⚡ Smart Grid Electricity Theft Detection System")
 
 # Load dataset
