@@ -1,73 +1,68 @@
-# app.py
-import os
-import pandas as pd
 import streamlit as st
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix
+import pandas as pd
+import joblib
+import os
 
-# -----------------------
-# Load Dataset
-# -----------------------
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-dataset_path = os.path.join(BASE_DIR, "dataset", "smart_grid_electricity_theft_dataset_1000.csv")
-
-try:
-    data = pd.read_csv(dataset_path)
-except FileNotFoundError:
-    st.error(f"Dataset not found at: {dataset_path}")
+# ------------------------------
+# Load model
+# ------------------------------
+model_path = "model.pkl"
+if not os.path.exists(model_path):
+    st.error(f"Model file not found at {model_path}")
     st.stop()
 
-# -----------------------
-# Prepare Data for Training
-# -----------------------
-# Exclude non-feature columns
-X = data.drop(['consumer_id', 'theft_label'], axis=1)
-y = data['theft_label']
+model = joblib.load(model_path)
 
-# Train/Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Train Random Forest Model
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-
-# Evaluate Model
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-cm = confusion_matrix(y_test, y_pred)
-
-# -----------------------
-# Streamlit App
-# -----------------------
 st.title("Smart Grid Electricity Theft Detection")
-st.write("Predict electricity theft based on consumer usage patterns.")
+st.write("Enter the details below to predict electricity theft:")
 
-# Sidebar Input
-st.sidebar.header("Enter Consumer Data")
-avg_daily_usage = st.sidebar.number_input("Average Daily Usage (kWh)", min_value=0.0)
-peak_usage = st.sidebar.number_input("Peak Usage (kWh)", min_value=0.0)
-night_usage = st.sidebar.number_input("Night Usage (kWh)", min_value=0.0)
-voltage = st.sidebar.number_input("Voltage", min_value=0.0)
-current = st.sidebar.number_input("Current", min_value=0.0)
-power_factor = st.sidebar.number_input("Power Factor", min_value=0.0)
-anomaly_score = st.sidebar.number_input("Anomaly Score", min_value=0.0)
+# ------------------------------
+# Load test dataset (optional)
+# ------------------------------
+test_csv_path = "dataset/test_data.csv"
+if os.path.exists(test_csv_path):
+    data = pd.read_csv(test_csv_path)
+    # Detect features and label
+    label_col = "theft" if "theft" in data.columns else data.columns[-1]
+    X_test = data.drop(label_col, axis=1)
+    y_test = data[label_col]
+else:
+    st.warning("Test dataset not found. Metrics will be unavailable.")
+    X_test = pd.DataFrame(columns=model.feature_names_in_ if hasattr(model, "feature_names_in_") else [])
+    y_test = None
 
-input_df = pd.DataFrame(
-    [[avg_daily_usage, peak_usage, night_usage, voltage, current, power_factor, anomaly_score]],
-    columns=X.columns  # ensures feature names match training
-)
+# ------------------------------
+# Dynamic user input based on model features
+# ------------------------------
+user_input_dict = {}
+if X_test.empty and hasattr(model, "feature_names_in_"):
+    feature_names = model.feature_names_in_
+else:
+    feature_names = X_test.columns
 
-# Predict Button
+for feature in feature_names:
+    user_input_dict[feature] = st.number_input(feature, value=0.0)
+
+user_input_df = pd.DataFrame([user_input_dict])
+
+# ------------------------------
+# Prediction
+# ------------------------------
 if st.button("Predict Theft"):
-    prediction = model.predict(input_df)[0]
-    result = "Theft Detected ⚠️" if prediction == 1 else "No Theft ✅"
-    st.subheader("Prediction Result:")
-    st.write(result)
+    try:
+        prediction = model.predict(user_input_df)
+        st.success(f"**Theft Prediction:** {'Yes' if prediction[0] == 1 else 'No'}")
+    except Exception as e:
+        st.error(f"Prediction error: {e}")
 
-# Show Model Metrics
-st.subheader("Model Accuracy")
-st.write(f"{accuracy*100:.2f}%")
-
-st.subheader("Confusion Matrix")
-st.write(cm)
+# ------------------------------
+# Optional: Show model metrics
+# ------------------------------
+if y_test is not None and st.checkbox("Show model accuracy and confusion matrix"):
+    from sklearn.metrics import accuracy_score, confusion_matrix
+    y_pred = model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
+    st.write("**Model Accuracy on Test Data:**", acc)
+    st.write("**Confusion Matrix:**")
+    st.write(cm)
